@@ -1,8 +1,12 @@
+#ROS2 Python node example
+#Creates a timer that logs an incrementing counter every second
+#uses object-oriented programming, inherits all methods,properties from class Node
+
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
 
-
+# MyNode inherits from Node, the base class for all ROS2 nodes
 class MyNode(Node):
 
     def __init__(self):
