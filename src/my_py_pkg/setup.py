@@ -23,8 +23,11 @@ setup(
         ],
     },
     entry_points={
+        #add new executables here as you made more nodes, don't forget comma at end of preceding line!
         'console_scripts': [
-            "py_node = my_py_pkg.my_first_node:main"
+            "py_node = my_py_pkg.my_first_node:main",
+            "robot_news_station = my_py_pkg.robot_news_station:main", #:main indicates that we want to call main function from this node
+            "smartphone = my_py_pkg.smartphone:main"
         ],
     },
 )
