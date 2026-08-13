@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_bot"> <!-- allows for use of xacro -->
+
+  <!-- dimensions of hardware, update once you get kit; function like global variables -->
+  <xacro:property name="chassis_length" value="0.30"/>
+  <xacro:property name="chassis_width"  value="0.20"/>
+  <xacro:property name="chassis_height" value="0.10"/>
+  <xacro:property name="wheel_radius"   value="0.033"/>
+  <xacro:property name="wheel_width"    value="0.026"/>
+  <xacro:property name="wheel_track"    value="0.22"/>   <!-- distance between wheel centers -->
+  <xacro:property name="caster_radius"  value="${wheel_radius/2}"/>
+
+  <!-- material colors -->
+  <material name="blue"><color rgba="0.2 0.2 0.8 1"/></material>
+  <material name="dark"><color rgba="0.15 0.15 0.15 1"/></material>
+
+  <!-- base_footprint: the robot's shadow on the ground -->
+  <link name="base_footprint"/>
+
+  <!-- base_link: the chassis-->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0.10 0 ${chassis_height/2}" rpy="0 0 0"/> <!-- we put the chasis at axis height-->
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+
+  <!-- link between base_footprint and base_joint -->
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- creating a template for a wheel that can be re-used for left and right wheels-->
+  <xacro:macro name="wheel" params="side y_reflect">
+    <link name="${side}_wheel">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="dark"/>
+      </visual>
+    </link>
+
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${side}_wheel"/>
+      <origin xyz="0 ${y_reflect * wheel_track/2} 0" rpy="${-pi/2} 0 0"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+  </xacro:macro>
+  <!-- end of wheel template; now you can re-use this code and prevent redundancy -->
+
+  <!-- left_wheel_joint; using template -->
+  <xacro:wheel side="left"  y_reflect="1"/>
+  <!-- right_wheel_joint; using template -->
+  <xacro:wheel side="right" y_reflect="-1"/>
+
+  <!--caster wheel link-->
+  <link name="caster">
+    <visual>
+      <geometry><sphere radius="${caster_radius}"/></geometry>
+      <material name="dark"/>
+    </visual>
+  </link>
+  <!--caster wheel joint-->
+  <joint name="caster_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster"/>
+    <origin xyz="0.20 0 ${-(wheel_radius - caster_radius)}" rpy="0 0 0"/>  <!--sits towards front of chasis-->
+  </joint>
+
+</robot>
