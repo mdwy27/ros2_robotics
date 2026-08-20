@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<!-- this code allows for differential drive pluggin for Gazebo-->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+
+      <!-- left and right wheels are used to drive/steer the bot -->
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+
+      <!-- odometry needs these to calculate robot's 'belief' of where it is -->
+      <wheel_separation>${wheel_track}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+
+      <!-- topics and frames used to interpret robot's position-->
+      <topic>cmd_vel</topic> <!-- velocity data is used to interpret distance traveled-->
+      <odom_topic>odom</odom_topic> <!-- odometry data reflects where the robot believes it is positioned-->
+      <frame_id>odom</frame_id> <!--the parent frame is the odometry frame, which is the fixed point that GIGI spawned into (her origin upon launching Gazebo)-->
+      <child_frame_id>base_footprint</child_frame_id> <!--the child frame is the base_footprint, GIGI's body/position-->
+      <!--odometry cares about: where is the parent frame (GIGI's original position) positioned relative to the child frame (GIGI's current position) at this moment-->
+ 
+      <!--robot's beliefs about where it is are refreshed and punlished frequently as it moves-->
+      <odom_publish_frequency>30</odom_publish_frequency> <!-- updated 30 times per second-->
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+    </plugin>
+  </gazebo>
+
+  <!--in Gazebo, we need caster wheel to have friction so it doesn't slip-->
+  <gazebo reference="caster">
+    <mu1 value="0.001"/> <!--you can adjust friction coefficient as needed-->
+    <mu2 value="0.001"/>
+  </gazebo>
+
+</robot>

@@ -23,7 +23,8 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(DIRECTORY urdf launch rviz #necessary to help the launch file find the folder that contains your robot_description
+#locating paths to necessary packages needed to launch GIGI in ros2
+install(DIRECTORY urdf launch rviz config #necessary to help the launch file find the folder that contains your robot_description
   DESTINATION share/${PROJECT_NAME}
 )
 

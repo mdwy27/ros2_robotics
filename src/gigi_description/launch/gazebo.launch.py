@@ -14,24 +14,34 @@ def generate_launch_description():
     xacro_file = os.path.join(pkg_path, 'urdf', 'gigi.urdf.xacro')
     robot_description = ParameterValue(Command(['xacro ', xacro_file]), value_type=str)
 
-    robot_state_publisher = Node(
+    robot_state_publisher = Node( #launching brings up robot_state_publisher
         package='robot_state_publisher',
         executable='robot_state_publisher',
         parameters=[{'robot_description': robot_description}],
     )
 
-    gazebo = IncludeLaunchDescription(
+    gazebo = IncludeLaunchDescription( #launching brings up Gazebo
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={'gz_args': '-r empty.sdf'}.items(),
     )
 
-    spawn = Node(
+    spawn = Node( #launching spawns GIGI
         package='ros_gz_sim',
         executable='create',
         arguments=['-topic', 'robot_description', '-name', 'gigi', '-z', '0.1'],
         output='screen',
     )
 
-    return LaunchDescription([robot_state_publisher, gazebo, spawn])
+    bridge = Node( #launching will bring up the gz_ros_bridge
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        arguments=[
+            '--ros-args', '-p',
+            f'config_file:={os.path.join(pkg_path, "config", "gz_ros_bridge.yaml")}'
+        ],
+        output='screen',
+    )
+
+    return LaunchDescription([robot_state_publisher, gazebo, spawn, bridge])

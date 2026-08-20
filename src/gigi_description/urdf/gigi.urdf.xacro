@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_bot"> <!-- allows for use of xacro -->
-    <xacro:include filename="inertial_macros.xacro"/> <!-- pulling in the inertial macros file, so xacro can stitch them together-->
 
   <!-- dimensions of hardware, update once you get kit; function like global variables -->
   <xacro:property name="chassis_length" value="0.30"/>
@@ -10,6 +9,10 @@
   <xacro:property name="wheel_width"    value="0.026"/>
   <xacro:property name="wheel_track"    value="0.22"/>   <!-- distance between wheel centers -->
   <xacro:property name="caster_radius"  value="${wheel_radius/2}"/>
+
+  <!-- here are all of the includes that need to be stitched together when Gazebo is launched-->
+  <xacro:include filename="inertial_macros.xacro"/> <!-- pulling in the inertial macros file, so xacro can stitch them together-->
+  <xacro:include filename="diff_drive_control.xacro"/>
 
   <!-- material colors -->
   <material name="blue"><color rgba="0.2 0.2 0.8 1"/></material>

@@ -1,0 +1,24 @@
+#the purpose of this code is to create a bridge between ROS2 and Gazebo
+#Specifically, it specifies which topics (and their data) need to be shared
+#and translated between the two in order to get odometry to work
+
+#topic 1: velocity; keyboard commands go into Gazebo
+- ros_topic_name: "/cmd_vel"
+  gz_topic_name: "/cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ #ROS --> GZ
+
+#topic 2: odometry: robot's belief about it's position comes out of Gazebo
+- ros_topic_name: "/odom"
+  gz_topic_name: "/odom"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS #GZ --> ROS
+
+#topic 3: tf tree: information about relative position of odom and base_footprint frames comes out of Gazebo
+- ros_topic_name: "/tf"
+  gz_topic_name: "/tf"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS #GZ --> ROS
