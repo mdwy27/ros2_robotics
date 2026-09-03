@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- adding a link : the LIDAR itself -->
+  <link name="laser_frame">
+    <visual>
+      <geometry><cylinder radius="0.03" length="0.04"/></geometry>
+      <material name="dark"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.03" length="0.04"/></geometry>
+    </collision>
+    <xacro:inertial_cylinder mass="0.1" length="0.04" radius="0.03">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:inertial_cylinder>
+  </link>
+
+  <joint name="laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_frame"/>
+    <origin xyz="0.10 0 ${chassis_height/2 + 0.15}" rpy="0 0 0"/> <!-- here we have LIDAR situated forward and up relative to chasis, adjust as needed-->
+  </joint>
+
+  <!-- this info will only be accessed by Gazebo, necessary to turn LIDAR from a visualization/description to a functional laser in the simulation-->
+  <gazebo reference="laser_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo>
+
+  <gazebo reference="laser_frame">
+    <sensor name="laser" type="gpu_lidar">
+      <topic>scan</topic>
+      <update_rate>10</update_rate> <!-- collecting data ten times per second-->
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples> <!-- one data point taken every degree in a full circle surrounding the bot-->
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle> 
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>1</samples>
+            <resolution>1</resolution>
+            <min_angle>0</min_angle>
+            <max_angle>0</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.12</min> <!-- in meters, the range the LIDAR scans for objects-->
+          <max>12.0</max>
+        </range>
+      </lidar>
+      <frame_id>laser_frame</frame_id>
+    </sensor>
+  </gazebo>
+
+</robot>

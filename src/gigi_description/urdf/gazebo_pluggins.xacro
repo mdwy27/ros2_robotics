@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-<!-- this code allows for differential drive pluggin for Gazebo-->
+<!-- differential drive pluggin for Gazebo-->
   <gazebo>
     <plugin filename="gz-sim-diff-drive-system"
             name="gz::sim::systems::DiffDrive">
@@ -24,6 +24,19 @@
       <!--robot's beliefs about where it is are refreshed and punlished frequently as it moves-->
       <odom_publish_frequency>30</odom_publish_frequency> <!-- updated 30 times per second-->
       <max_linear_acceleration>1.0</max_linear_acceleration>
+    </plugin>
+  </gazebo>
+
+  <gazebo> <!-- LIDAR sensor pluggin-->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
     </plugin>
   </gazebo>
 
