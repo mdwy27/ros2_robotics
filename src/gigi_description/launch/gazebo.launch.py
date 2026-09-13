@@ -11,6 +11,7 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     pkg_path = get_package_share_directory('gigi_description')
+    world_path = os.path.join(pkg_path, 'worlds', 'four_wall_world.sdf') #path to use later to launch world with 4 walls for GIGI to drive around in simulation
     xacro_file = os.path.join(pkg_path, 'urdf', 'gigi.urdf.xacro')
     robot_description = ParameterValue(Command(['xacro ', xacro_file]), value_type=str)
 
@@ -24,7 +25,8 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={'gz_args': '-r empty.sdf'}.items(),
+        launch_arguments={'gz_args': f'-r {world_path}'}.items(), #when gazebo launches, it uses world path to launch the four_wall_world.sdf
+        #these arguments tell gazebo what to open
     )
 
     spawn = Node( #launching spawns GIGI
@@ -44,4 +46,10 @@ def generate_launch_description():
         output='screen',
     )
 
-    return LaunchDescription([robot_state_publisher, gazebo, spawn, bridge])
+    scan_frame_bridge = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'laser_frame', 'gigi/laser_frame/laser'],
+    )
+
+    return LaunchDescription([robot_state_publisher, gazebo, spawn, bridge, scan_frame_bridge])

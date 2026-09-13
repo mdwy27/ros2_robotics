@@ -52,7 +52,7 @@
           <max>12.0</max>
         </range>
       </lidar>
-      <frame_id>laser_frame</frame_id>
+      <gz_frame_id>laser_frame</gz_frame_id>
     </sensor>
   </gazebo>
 
