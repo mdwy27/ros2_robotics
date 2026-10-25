@@ -8,11 +8,13 @@
 //wiring scheme, connects ESP32-S3 (microcontroller) and AT8236 (motordriver)
 //the esp32 I am using is from Adafruit, the AT8236 board is from Yahboom
 //edit these pin numbers as needed to accomodate your setup
-const int L_IN1 = 4, L_IN2 = 5;   // left motor -> AT8236
-const int R_IN1 = 6, R_IN2 = 7;   // right motor -> AT8236
+const int L_IN1 = 6, L_IN2 = 7;   // left motor/wheel -> AT8236 (swapped because originally motor A spun wheel backwards)
+const int R_IN1 = 5, R_IN2 = 4;   // right motor/wheel -> AT8236
 const float WHEEL_SEP = 0.12;     // m, measure center-to-center of wheels
 const float MAX_SPEED = 0.5;      // m/s treated as full PWM (rough, tune later)
 const unsigned long TIMEOUT_MS = 500; // stop if no command for this long
+const int MIN_PWM = 120;   // figured this out from troubleshooting: kept raising MIN_PWM until bot was able to turn R/L just slightly
+//the threshold MIN_PWM appeared to be ~100, anything below this and the bot couldn't turn, motors board beeped indicating error
 
 //declaring nodes and subscriptions to shared topics
 rcl_subscription_t sub;
@@ -24,8 +26,15 @@ rcl_node_t node;
 unsigned long lastCmd = 0;
 
 //declaring and defining the function that will set speed of both motors; turns the commanded speed (m/s) into a PWM value
+//originally, motors weren't getting large enough signal to actually turn wheels, there was a loud beeping noise
+//so, now a MIN_PWM is being implemented to ensure the wheels get a strong enough signal
 void setMotor(int in1, int in2, float v) {
-  int pwm = constrain((int)(fabs(v) / MAX_SPEED * 255), 0, 255);
+  int pwm = 0;
+  if (fabs(v) > 0.001) {
+    // maps (0, MAX_SPEED] onto [MIN_PWM, 255] instead of [0, 255] to ensure signal is sufficient to turn wheels
+    pwm = MIN_PWM + (int)(fabs(v) / MAX_SPEED * (255 - MIN_PWM));
+  }
+  pwm = constrain(pwm, 0, 255);
   if (v >= 0) { analogWrite(in1, pwm); analogWrite(in2, 0); }
   else        { analogWrite(in1, 0);   analogWrite(in2, pwm); }
 }
