@@ -11,8 +11,8 @@
 //wiring scheme, connects ESP32-S3 (microcontroller) and AT8236 (motordriver)
 //the esp32 I am using is from Adafruit, the AT8236 board is from Yahboom
 //edit these pin numbers as needed to accomodate your setup
-const int L_IN1 = 6, L_IN2 = 7;   // left motor/wheel -> AT8236 (swapped because originally motor A spun wheel backwards)
-const int R_IN1 = 5, R_IN2 = 4;   // right motor/wheel -> AT8236
+const int L_IN1 = 6, L_IN2 = 7;   // left motor/wheel -> AT8236 
+const int R_IN1 = 5, R_IN2 = 4;   // right motor/wheel -> AT8236 (swapped because originally motor A spun wheel backwards)
 
 //encoder wiring: each motor's hall encoder has two signals (A and B) -> ESP32 GPIO
 //checked with multimeter first: encoder signals peak at ~3.3V, safe for ESP32 pins
@@ -28,7 +28,7 @@ const float M_PER_TICK = 2.0 * PI * WHEEL_RADIUS / TICKS_PER_REV;   // distance 
 const float MAX_SPEED = 0.5;      // m/s treated as full PWM (rough, tune later)
 const unsigned long TIMEOUT_MS = 500; // stop if no command for this long
 const int MIN_PWM = 120;   // figured this out from troubleshooting: kept raising MIN_PWM until bot was able to turn R/L just slightly
-//the threshold MIN_PWM appeared to be ~100, anything below this and the bot couldn't turn, motors board beeped indicating error
+//the threshold MIN_PWM appeared to be ~100, anything below this and the bot couldn't turn, motors board "whined" as it stalled
 const unsigned long ODOM_PERIOD_MS = 50;   // publish odometry every 50 ms (20 Hz)
 
 //declaring nodes and subscriptions to shared topics
@@ -193,7 +193,7 @@ void setup() {
 
 void loop() {
   rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
-  if (millis() - lastCmd > TIMEOUT_MS) stopMotors();   // stops motors if no command has been received for 5 seconds; safety feature
+  if (millis() - lastCmd > TIMEOUT_MS) stopMotors();   // stops motors if no command has been received for 0.5 seconds; safety feature
 
   //compute and publish odometry on a fixed schedule (every ODOM_PERIOD_MS)
   if (millis() - lastOdom >= ODOM_PERIOD_MS) {
