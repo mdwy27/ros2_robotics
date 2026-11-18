@@ -7,6 +7,7 @@
 #include <rosidl_runtime_c/string_functions.h>
 #include <geometry_msgs/msg/twist.h>
 #include <nav_msgs/msg/odometry.h>
+#include <std_msgs/msg/float32_multi_array.h>
 
 //wiring scheme, connects ESP32-S3 (microcontroller) and AT8236 (motordriver)
 //the esp32 I am using is from Adafruit, the AT8236 board is from Yahboom
@@ -26,7 +27,7 @@ const float TICKS_PER_REV = 1783.0;    // measured: turned each wheel 10 full tu
 const float M_PER_TICK = 2.0 * PI * WHEEL_RADIUS / TICKS_PER_REV;   // distance traveled per encoder tick (~0.116 mm)
 
 const float MAX_SPEED = 0.5;      // m/s treated as full PWM (rough, tune later)
-const unsigned long TIMEOUT_MS = 500; // stop if no command for this long
+const unsigned long TIMEOUT_MS = 500; // stop if no command for this long (0.5 s)
 const int MIN_PWM = 120;   // figured this out from troubleshooting: kept raising MIN_PWM until bot was able to turn R/L just slightly
 //the threshold MIN_PWM appeared to be ~100, anything below this and the bot couldn't turn, motors board "whined" as it stalled
 const unsigned long ODOM_PERIOD_MS = 50;   // publish odometry every 50 ms (20 Hz)
@@ -40,8 +41,17 @@ rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
-unsigned long lastCmd = 0;
+volatile unsigned long lastCmd = 0; //voltatile because it is shared by two tasks, loop() and watchdog
 unsigned long lastOdom = 0;
+
+//adding another publisher to gigi_base to publish actual wheel velocities
+rcl_publisher_t wheel_speed_pub;
+std_msgs__msg__Float32MultiArray wheel_speed_msg;
+float wheel_speed_data[4];                      // [L_cmd, R_cmd, L_meas, R_meas]
+
+float vL_cmd = 0.0, vR_cmd = 0.0;      // what each wheel was told (m/s)
+float vL_meas = 0.0, vR_meas = 0.0;    // what each wheel actually did (m/s)
+unsigned long lastOdomMicros = 0;      // real elapsed time, using esp32 time since boot
 
 //encoder tick counters, updated by interrupts every time an encoder signal changes
 //volatile tells the compiler these can change at any moment (from the interrupts)
@@ -93,9 +103,11 @@ void stopMotors() { setMotor(L_IN1, L_IN2, 0); setMotor(R_IN1, R_IN2, 0); }
 //this function will be used to turn commands sent over cmd_vel into velocity form (m/s)
 void cmdVelCb(const void *m) {
   const auto *t = (const geometry_msgs__msg__Twist *)m;
-  float v = t->linear.x, w = t->angular.z;
-  setMotor(L_IN1, L_IN2, v - w * WHEEL_SEP / 2);   // diff-drive kinematics
-  setMotor(R_IN1, R_IN2, v + w * WHEEL_SEP / 2);
+  float v = t->linear.x, w = t->angular.z; //v linear velocity w (omega) angular velocity; t is a pointer to these velocities
+  vL_cmd = v - w * WHEEL_SEP / 2;
+  vR_cmd = v + w * WHEEL_SEP / 2;
+  setMotor(L_IN1, L_IN2, vL_cmd);
+  setMotor(R_IN1, R_IN2, vR_cmd);
   lastCmd = millis();
 }
 
@@ -108,11 +120,15 @@ void updateOdometry() {
   long l = -leftTicks;   // left encoder counts negative going forward (mounted mirrored), so flip its sign
   interrupts();
 
-  float dt = ODOM_PERIOD_MS / 1000.0;
+  unsigned long nowMicros = micros(); //returns the number of microseconds since the esp32 was booted on
+  float dt = (nowMicros - lastOdomMicros) / 1000000.0; //change in time since last odometry reading
+  lastOdomMicros = nowMicros;
 
   //how far each wheel moved since the last update (m)
-  float dR = (r - prevRight) * M_PER_TICK;
-  float dL = (l - prevLeft)  * M_PER_TICK;
+  float dR = (r - prevRight) * M_PER_TICK; //how far the right wheel moved since last odometry reading
+  float dL = (l - prevLeft)  * M_PER_TICK; //how far the left wheel moved since last odometry reading
+  vL_meas = dL / dt; //calculating actual velocity of left wheel based on change in distance over dt
+  vR_meas = dR / dt; //calculating actual velocity of right wheel based on change in distance over dt
   prevRight = r;
   prevLeft = l;
 
@@ -145,6 +161,25 @@ void updateOdometry() {
   odom_msg.twist.twist.angular.z = dth / dt;
 
   rcl_publish(&odom_pub, &odom_msg, NULL);
+  
+  //storing the velocity (commanded) and velocity (measured) data in an array; gets re-written each time this function loops to stay up-to-date
+  wheel_speed_data[0] = vL_cmd;
+  wheel_speed_data[1] = vR_cmd;
+  wheel_speed_data[2] = vL_meas;
+  wheel_speed_data[3] = vR_meas;
+  rcl_publish(&wheel_speed_pub, &wheel_speed_msg, NULL);
+}
+
+//this is like a failsafe, runs every 20 ms and makes sure that, if no new velocity commands were recieved, wheels stop moving
+void watchdogTask(void *param) {
+  for (;;) {
+    if (millis() - lastCmd > TIMEOUT_MS) {
+      stopMotors();
+      vL_cmd = 0.0;
+      vR_cmd = 0.0;
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));   // check every 20 ms, sleep in between
+  }
 }
 
 //runs when esp32 is powered on
@@ -165,7 +200,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(L_ENC_A), leftISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(L_ENC_B), leftISR, CHANGE);
 
-  Serial.begin(115200);
+  Serial.begin(460800);
   set_microros_serial_transports(Serial);
   delay(2000);
 
@@ -175,9 +210,17 @@ void setup() {
   rclc_subscription_init_default(&sub, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist), "cmd_vel");
 
-  //publisher: same node now also sends odometry out on /odom
+  //publisher: on gigi_base node, to send out odometry data on /odom
   rclc_publisher_init_default(&odom_pub, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry), "odom");
+
+  //another publisher: on to gigi_base node, to send out wheel speed data on /wheel_speeds
+  rclc_publisher_init_best_effort(&wheel_speed_pub, &node, //best_effort used to prevent lag in communication between ESP32 and Pi; I was hving some issues with bot stalling 
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Float32MultiArray), "wheel_speeds");
+  std_msgs__msg__Float32MultiArray__init(&wheel_speed_msg);
+  wheel_speed_msg.data.data = wheel_speed_data;
+  wheel_speed_msg.data.size = 4;
+  wheel_speed_msg.data.capacity = 4;
 
   //set the odometry message's fixed fields once: which frames it relates (matches the simulation)
   nav_msgs__msg__Odometry__init(&odom_msg);
@@ -189,15 +232,25 @@ void setup() {
 
   rclc_executor_init(&executor, &support.context, 1, &allocator);
   rclc_executor_add_subscription(&executor, &sub, &cmd_msg, &cmdVelCb, ON_NEW_DATA);
+
+  lastOdomMicros = micros(); //updating timestamp of most recent odometry reading
+
+  xTaskCreate(watchdogTask, "watchdog", 2048, NULL, 2, NULL); //running the watchdog task to prevent uncontrolled motion
+  //once the watchdog task is started, keeps running independently of loop, so even if loop stalls we can count on it
 }
 
 void loop() {
   rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
-  if (millis() - lastCmd > TIMEOUT_MS) stopMotors();   // stops motors if no command has been received for 0.5 seconds; safety feature
 
   //compute and publish odometry on a fixed schedule (every ODOM_PERIOD_MS)
   if (millis() - lastOdom >= ODOM_PERIOD_MS) {
     lastOdom = millis();
     updateOdometry();
+  }
+  //sets velocity command to 0.0 after sufficient time (0.5 s) has passed since last command
+  if (millis() - lastCmd > TIMEOUT_MS) {
+    stopMotors();
+    vL_cmd = 0.0;
+    vR_cmd = 0.0;
   }
 }
